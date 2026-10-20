@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag that matches manifest.json's version (e.g. 0.2.0, no "v" prefix)
+# Push a tag that matches manifest.json's version (e.g. 0.3.1, no "v" prefix)
 # to build the plugin and publish a GitHub release with the required assets.
 on:
   push:
@@ -11,16 +11,17 @@ permissions:
   contents: write
   id-token: write
   attestations: write
+  artifact-metadata: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -36,10 +37,11 @@ jobs:
             exit 1
           fi
 
+      # Signed build provenance for the release files.
       # Artifact attestations are only available for public repositories on free plans.
       - name: Attest build provenance
         if: github.event.repository.visibility == 'public'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest@v4
         with:
           subject-path: |
             main.js
