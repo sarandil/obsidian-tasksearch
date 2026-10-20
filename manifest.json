@@ -1,0 +1,9 @@
+{
+  "id": "task-search",
+  "name": "Task search",
+  "version": "0.3.0",
+  "minAppVersion": "1.5.0",
+  "description": "Lists tasks from notes whose properties match a query, grouped by frontmatter title, with live filters by text, tag and task status.",
+  "author": "Laszlo Sarandi",
+  "isDesktopOnly": false
+}

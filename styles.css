@@ -1,0 +1,131 @@
+/* Task search – styles for the task-search code block */
+
+.tsearch {
+  padding: 4px;
+}
+
+.tsearch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-bottom: var(--size-4-2);
+}
+.tsearch-bar input[type="search"] {
+  flex: 0 1 300px;
+  max-width: 300px;
+  min-width: 8em;
+}
+.tsearch-count,
+.tsearch-meta,
+.tsearch-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* Status picker: dropdown button + multi-select popover */
+.tsearch-bar button.tsearch-status-button {
+  max-width: 260px;
+  justify-content: flex-start;
+}
+.tsearch-status-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tsearch-status-menu {
+  position: fixed;
+  top: var(--tsearch-pop-top, 0);
+  left: var(--tsearch-pop-left, 0);
+  min-width: 220px;
+  z-index: var(--layer-menu);
+}
+.tsearch-status-option {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  cursor: pointer;
+}
+.tsearch-status-option input[type="checkbox"] {
+  margin: 0;
+  flex: none;
+}
+.tsearch-status-option .menu-item-title {
+  flex: 1 1 auto;
+}
+.tsearch-status-symbol {
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+.tsearch-status-option-count {
+  min-width: 2ch;
+  text-align: end;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Search criteria summary under the toolbar */
+.tsearch-criteria {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1) var(--size-4-2);
+  margin-bottom: var(--size-4-3);
+  font-size: var(--font-ui-smaller);
+}
+.tsearch-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 1px var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  background-color: var(--background-secondary);
+}
+.tsearch-chip-label {
+  color: var(--text-muted);
+}
+.tsearch-chip-value {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+
+.tsearch-group {
+  margin-bottom: var(--size-4-2);
+}
+.tsearch-group > summary {
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+}
+.tsearch-meta {
+  margin-left: 0.5em;
+  font-weight: normal;
+}
+
+.tsearch ul.tsearch-tasks {
+  margin: var(--size-4-1) 0 0;
+  padding-inline-start: var(--size-4-4);
+}
+.tsearch li.tsearch-task {
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45em;
+  margin-inline-start: calc(var(--tsearch-depth, 0) * 1.4em);
+  text-indent: 0;
+  padding-inline-start: 0;
+}
+.tsearch li.tsearch-task > .task-list-item-checkbox {
+  margin: 0;
+  position: static;
+  flex: none;
+}
+.tsearch-task-text {
+  cursor: pointer;
+}
+.tsearch-task-text p {
+  display: inline;
+  margin: 0;
+}
