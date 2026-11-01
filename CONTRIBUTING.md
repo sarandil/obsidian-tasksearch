@@ -45,9 +45,11 @@ To try your build in Obsidian, copy `main.js`, `manifest.json` and `styles.css` 
 | `src/release-notes.ts` | The "What's new" window and the update check. |
 | `scripts/changelog.ts` | Build-time changelog check and release-notes output. |
 | `CHANGELOG.md` | Release notes, bundled into the plugin and used for GitHub releases. |
-| `src/block-config.ts` | Reads the YAML block configuration and recognises blocks in the pre-0.4.0 format, with no Obsidian dependency. |
+| `src/block-config.ts` | Reads and writes the YAML block configuration and recognises blocks in the pre-0.4.0 format, with no Obsidian dependency. |
+| `src/block-source.ts` | Finds and rewrites a block in the note text, with no Obsidian dependency. |
+| `src/block-writer.ts` | Saves configuration changes made in the rendered view to the code block. |
 | `src/logic.ts` | Pure helpers (matching, statuses, task line handling) with no Obsidian dependency. |
-| `test/` | Unit tests for `src/logic.ts`, `src/block-config.ts` and `src/changelog.ts`. |
+| `test/` | Unit tests for `src/logic.ts`, `src/block-config.ts`, `src/block-source.ts` and `src/changelog.ts`. |
 | `styles.css` | Styles; all classes use the `tsearch-` prefix. |
 
 ## Pull requests
@@ -55,7 +57,7 @@ To try your build in Obsidian, copy `main.js`, `manifest.json` and `styles.css` 
 - Base your branch on `dev` and open the pull request against `dev`.
 - Keep each pull request focused on one change.
 - Make sure `npm run lint`, `npm test` and `npm run build` all pass.
-- Add or update tests in `test/` when you change anything in `src/logic.ts`, `src/block-config.ts` or `src/changelog.ts`.
+- Add or update tests in `test/` when you change anything in `src/logic.ts`, `src/block-config.ts`, `src/block-source.ts` or `src/changelog.ts`.
 - Add your user-facing changes to `CHANGELOG.md`, under the section of the next version. If users have to change their blocks, add a `### Migration` subsection with a before/after example. Write each list item and paragraph on a single line: the "What's new" window shows line breaks as they are in the file.
 - Update `README.md` when you change user-facing behaviour or options.
 - All user-facing text is in English and uses sentence case.

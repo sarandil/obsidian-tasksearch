@@ -226,3 +226,80 @@ export function normalizeFolder(f: string): string {
 export function normalizeTag(t: string): string {
   return t.trim().replace(/^#+/, "");
 }
+
+// ----- Writing -----
+
+export type YamlStringifier = (value: unknown) => string;
+
+/** Canonical option order for options that aren't in the block yet. */
+const WRITE_ORDER = ["query", "properties", "source", "status", "include-self"];
+
+/** True if both configurations search for the same thing. */
+export function sameConfig(a: BlockConfig, b: BlockConfig): boolean {
+  const list = (x: string[]) => JSON.stringify(x);
+  return (
+    a.query === b.query &&
+    list(a.properties) === list(b.properties) &&
+    list(a.folders) === list(b.folders) &&
+    list(a.tags) === list(b.tags) &&
+    list(statusOrder(a.status)) === list(statusOrder(b.status)) &&
+    a.includeSelf === b.includeSelf
+  );
+}
+
+/**
+ * Serialises `cfg` as the new block text. Options keep the order they have in `previousSrc`;
+ * new ones are added in the canonical order. Options with their default value are left out,
+ * and options the plugin doesn't know are kept as they are. Comments are not kept.
+ */
+export function serializeBlock(
+  cfg: BlockConfig,
+  previousSrc: string,
+  parseYaml: YamlParser,
+  stringifyYaml: YamlStringifier,
+): string {
+  const values = optionValues(cfg);
+  let previous: Record<string, unknown> = {};
+  try {
+    const parsed = hasContent(previousSrc) ? parseYaml(previousSrc) : null;
+    if (isPlainObject(parsed)) previous = parsed;
+  } catch {
+    // An unreadable block is replaced completely.
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(previous)) {
+    const key = name.toLowerCase().trim();
+    if (!KNOWN_KEYS.includes(key)) out[name] = value;
+    else if (key in values) out[key] = values[key];
+  }
+  for (const key of WRITE_ORDER) {
+    if (key in values && !(key in out)) out[key] = values[key];
+  }
+  return Object.keys(out).length ? stringifyYaml(out).trimEnd() : "";
+}
+
+/** The options of `cfg` that differ from the defaults, as YAML values. */
+function optionValues(cfg: BlockConfig): Record<string, unknown> {
+  const v: Record<string, unknown> = {};
+  if (cfg.query) v["query"] = cfg.query;
+  if (cfg.properties.length) v["properties"] = [...cfg.properties];
+  if (cfg.folders.length || cfg.tags.length) {
+    const source: Record<string, string[]> = {};
+    if (cfg.folders.length) source["folders"] = [...cfg.folders];
+    if (cfg.tags.length) source["tags"] = [...cfg.tags];
+    v["source"] = source;
+  }
+  const status = statusOrder(cfg.status);
+  const all = parseStatuses(["all"]);
+  if (status.length === all.length) v["status"] = "all";
+  else if (JSON.stringify(status) !== JSON.stringify(parseStatuses())) v["status"] = status;
+  if (cfg.includeSelf) v["include-self"] = true;
+  return v;
+}
+
+/** Status ids in the order of the status dropdown, without unknown ids. */
+function statusOrder(ids: string[]): string[] {
+  const all = parseStatuses(["all"]);
+  return all.filter(id => ids.includes(id));
+}

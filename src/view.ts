@@ -13,6 +13,7 @@ import {
   getAllTags,
 } from "obsidian";
 import { BlockConfig } from "./block-config";
+import type { BlockWriter } from "./block-writer";
 import {
   STATUS_CHOICES,
   STATUS_FILTERS,
@@ -36,6 +37,8 @@ export interface ViewState {
   tag: string;
   /** Selected statuses (ids from STATUS_FILTERS). */
   statuses: Set<string>;
+  /** The `status` option of the block when the selection was last synced with it. */
+  blockStatus: string;
   collapsed: Set<string>;
 }
 
@@ -78,6 +81,7 @@ export class TaskSearchView extends MarkdownRenderChild {
     private cfg: BlockConfig,
     private sourcePath: string,
     private state: ViewState,
+    private writer: BlockWriter,
     private configError?: string,
     /** The block is in the pre-0.4.0 format; the error offers the release notes. */
     private legacyFormat = false,
@@ -118,7 +122,15 @@ export class TaskSearchView extends MarkdownRenderChild {
       this.render();
     });
 
-    this.statusPicker = this.addChild(new StatusPicker(bar, this.state.statuses, () => this.render()));
+    this.statusPicker = this.addChild(
+      new StatusPicker(
+        bar,
+        this.state.statuses,
+        () => this.render(),
+        // Saved when the dropdown closes: the re-render after the write would close it.
+        () => void this.saveStatuses(),
+      ),
+    );
 
     this.counter = bar.createSpan({ cls: "tsearch-count" });
     this.renderCriteria(root);
@@ -351,6 +363,14 @@ export class TaskSearchView extends MarkdownRenderChild {
   }
 
   // ----- actions -----
+
+  /** Writes the status selection to the block; an empty selection is not saved. */
+  private async saveStatuses(): Promise<void> {
+    if (!this.state.statuses.size) return;
+    const status = STATUS_FILTERS.map(f => f.id).filter(id => this.state.statuses.has(id));
+    this.state.blockStatus = status.join(",");
+    await this.writer.save({ ...this.cfg, status });
+  }
 
   private async setStatus(g: TaskGroup, t: TaskItem, ch: string): Promise<void> {
     if (ch === t.status) return;

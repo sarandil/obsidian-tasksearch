@@ -1,5 +1,7 @@
 import { Plugin, parseYaml } from "obsidian";
 import { BlockConfig, parseBlock } from "./block-config";
+import { blockIndex } from "./block-source";
+import { BlockWriter } from "./block-writer";
 import { checkForUpdate } from "./changelog";
 import { ReleaseNotesModal, allEntries, entriesForUpdate, vaultHasTaskSearchBlock } from "./release-notes";
 import { DEFAULT_SETTINGS, TaskSearchSettingTab, TaskSearchSettings } from "./settings";
@@ -16,8 +18,12 @@ export default class TaskSearchPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("task-search", (src, el, ctx) => {
       const { config, error, legacy } = parseBlock(src, parseYaml);
-      const state = this.stateFor(`${ctx.sourcePath}::${src}`, config);
-      ctx.addChild(new TaskSearchView(this, el, config, ctx.sourcePath, state, error, legacy));
+      // The block's position in the note is a key that survives edits of the block text.
+      const info = ctx.getSectionInfo(el);
+      const key = info ? `${ctx.sourcePath}::#${blockIndex(info.text, info.lineStart)}` : `${ctx.sourcePath}::${src}`;
+      const state = this.stateFor(key, config);
+      const writer = new BlockWriter(this.app, ctx, el, src);
+      ctx.addChild(new TaskSearchView(this, el, config, ctx.sourcePath, state, writer, error, legacy));
     });
 
     this.addCommand({
@@ -48,11 +54,20 @@ export default class TaskSearchPlugin extends Plugin {
     await this.saveSettings();
   }
 
+  /**
+   * The UI state of a block. When the status option in the block text has changed
+   * (edited by hand), the status selection follows it; other filters are kept.
+   */
   private stateFor(key: string, cfg: BlockConfig): ViewState {
+    const blockStatus = cfg.status.join(",");
     let s = this.states.get(key);
     if (!s) {
-      s = { filter: "", tag: "", statuses: new Set(cfg.status), collapsed: new Set() };
+      s = { filter: "", tag: "", statuses: new Set(cfg.status), blockStatus, collapsed: new Set() };
       this.states.set(key, s);
+    } else if (s.blockStatus !== blockStatus) {
+      s.statuses.clear();
+      for (const id of cfg.status) s.statuses.add(id);
+      s.blockStatus = blockStatus;
     }
     return s;
   }

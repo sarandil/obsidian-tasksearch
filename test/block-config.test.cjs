@@ -177,3 +177,54 @@ test("an option given twice in different case is an error", () => {
   assertError("Query: a\nquery: b", /`query` is given more than once/);
   assertError("source:\n  Folders:\n    - A\n  folders:\n    - B", /`folders` is given more than once/);
 });
+
+// ----- Writing -----
+
+const stringify = v => YAML.stringify(v);
+const write = (c, prev = "") => B.serializeBlock(c, prev, text => YAML.parse(text), stringify);
+const conf = over => ({ ...DEFAULTS, ...over });
+
+test("serializeBlock writes YAML that reads back to the same configuration", () => {
+  const configs = [
+    DEFAULTS,
+    conf({ query: "client-x", properties: ["project", "client"] }),
+    conf({ query: "007", folders: ["Work", "Notes, misc"], tags: ["client/abc"] }),
+    conf({ query: "#client", status: ["done", "question"], includeSelf: true }),
+    conf({ properties: ["*"], status: ["todo", "done", "question", "important", "star", "other"] }),
+    conf({ query: "a: b", tags: ["team"] }),
+  ];
+  for (const c of configs) {
+    const text = write(c);
+    assert.ok(B.sameConfig(cfg(text), c), `round trip failed for:\n${text}`);
+  }
+});
+
+test("serializeBlock leaves out defaults and uses `status: all`", () => {
+  assert.strictEqual(write(DEFAULTS), "");
+  assert.strictEqual(write(conf({ status: ["todo"] })), "");
+  assert.strictEqual(write(conf({ status: ["star", "todo", "done", "question", "important", "other"] })), "status: all");
+  assert.strictEqual(
+    write(conf({ query: "x", folders: ["Work"], status: ["question", "todo"], includeSelf: true })),
+    ["query: x", "source:", "  folders:", "    - Work", "status:", "  - todo", "  - question", "include-self: true"].join(
+      "\n",
+    ),
+  );
+});
+
+test("serializeBlock keeps the option order and unknown options of the block", () => {
+  const prev = "status: done\nmy-note: keep me\nQuery: old";
+  assert.strictEqual(
+    write(conf({ query: "new", status: ["todo", "done"], properties: ["client"] }), prev),
+    ["status:", "  - todo", "  - done", "my-note: keep me", "query: new", "properties:", "  - client"].join("\n"),
+  );
+});
+
+test("serializeBlock drops options that went back to the default", () => {
+  assert.strictEqual(write(conf({ query: "x" }), "query: x\nstatus: done\ninclude-self: true"), "query: x");
+});
+
+test("sameConfig ignores the order of statuses", () => {
+  assert.ok(B.sameConfig(conf({ status: ["done", "todo"] }), conf({ status: ["todo", "done"] })));
+  assert.ok(!B.sameConfig(conf({ query: "a" }), conf({ query: "b" })));
+  assert.ok(!B.sameConfig(conf({ folders: ["A", "B"] }), conf({ folders: ["B", "A"] })));
+});
