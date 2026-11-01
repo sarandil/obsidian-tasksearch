@@ -140,7 +140,7 @@ test("text that isn't a configuration reports an error", () => {
 });
 
 test("a tab-indented YAML block reports the YAML error", () => {
-  const r = parse('query: "afc.architecture"\nproperties:\n\t- timesheet-work\n\t- parent-note\ninclude-self: true');
+  const r = parse('query: "client-x"\nproperties:\n\t- project\n\t- client\ninclude-self: true');
   assert.strictEqual(r.legacy, undefined);
   assert.match(r.error, /isn't valid YAML/);
   assert.match(r.error, /Indent with spaces, not tabs\./);
