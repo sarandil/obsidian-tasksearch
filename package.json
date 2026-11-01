@@ -7,7 +7,7 @@
     "build": "npm run changelog -- check && tsc --noEmit && esbuild src/main.ts --bundle --format=cjs --target=es2020 --platform=browser --external:obsidian --external:electron --loader:.md=text --outfile=main.js",
     "dev": "esbuild src/main.ts --bundle --format=cjs --target=es2020 --platform=browser --external:obsidian --external:electron --loader:.md=text --outfile=main.js --watch",
     "lint": "eslint .",
-    "test": "esbuild src/logic.ts --format=cjs --outfile=.test/logic.cjs --log-level=warning && esbuild src/changelog.ts --format=cjs --outfile=.test/changelog.cjs --log-level=warning && node --test test/logic.test.cjs test/changelog.test.cjs",
+    "test": "esbuild src/logic.ts --format=cjs --outfile=.test/logic.cjs --log-level=warning && esbuild src/block-config.ts --bundle --format=cjs --outfile=.test/block-config.cjs --log-level=warning && esbuild src/changelog.ts --format=cjs --outfile=.test/changelog.cjs --log-level=warning && node --test test/logic.test.cjs test/block-config.test.cjs test/changelog.test.cjs",
     "changelog": "esbuild scripts/changelog.ts --bundle --platform=node --format=esm --outfile=.build/changelog.mjs --log-level=warning && node .build/changelog.mjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
@@ -19,7 +19,8 @@
     "eslint-plugin-obsidianmd": "^0.4.2",
     "obsidian": "1.14.4",
     "typescript": "^5.6.0",
-    "typescript-eslint": "^8.72.0"
+    "typescript-eslint": "^8.72.0",
+    "yaml": "^2.9.1"
   },
   "description": "Lists tasks from notes whose properties match a query, grouped by frontmatter title, with live filters by text, tag and task status.",
   "license": "MIT",

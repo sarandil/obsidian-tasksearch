@@ -12,20 +12,20 @@ import {
   debounce,
   getAllTags,
 } from "obsidian";
+import { BlockConfig } from "./block-config";
 import {
-  Config,
   STATUS_CHOICES,
   STATUS_FILTERS,
   fmGet,
   inSource,
   noteMatchesQuery,
   setTaskStatus,
-  splitList,
   matchesStatuses,
   taskText,
   toText,
   toggleStatus,
 } from "./logic";
+import { ReleaseNotesModal, allEntries } from "./release-notes";
 import { DEFAULT_SETTINGS } from "./settings";
 import { StatusPicker } from "./status-picker";
 import type TaskSearchPlugin from "./main";
@@ -75,9 +75,12 @@ export class TaskSearchView extends MarkdownRenderChild {
   constructor(
     private plugin: TaskSearchPlugin,
     containerEl: HTMLElement,
-    private cfg: Config,
+    private cfg: BlockConfig,
     private sourcePath: string,
     private state: ViewState,
+    private configError?: string,
+    /** The block is in the pre-0.4.0 format; the error offers the release notes. */
+    private legacyFormat = false,
   ) {
     super(containerEl);
     this.app = plugin.app;
@@ -87,6 +90,18 @@ export class TaskSearchView extends MarkdownRenderChild {
     const root = this.containerEl;
     root.empty();
     root.addClass("tsearch");
+
+    if (this.configError) {
+      const err = root.createDiv({ cls: "tsearch-error" });
+      err.createSpan({ text: this.configError });
+      if (this.legacyFormat) {
+        const btn = err.createEl("button", { cls: "tsearch-error-action", text: "Show release notes" });
+        btn.addEventListener("click", () =>
+          new ReleaseNotesModal(this.app, "Release notes", allEntries(this.plugin.manifest.version)).open(),
+        );
+      }
+      return;
+    }
 
     const bar = root.createDiv({ cls: "tsearch-bar" });
 
@@ -148,19 +163,22 @@ export class TaskSearchView extends MarkdownRenderChild {
   }
 
   private async collect(): Promise<TaskGroup[]> {
-    const needle = (this.cfg["query"] ?? "").toLowerCase().trim();
-    const props = splitList(this.cfg["properties"]);
-    const sources = splitList(this.cfg["source"]);
+    const { properties, folders, tags: sourceTags, includeSelf } = this.cfg;
+    const needle = this.cfg.query.toLowerCase();
     const out: TaskGroup[] = [];
 
     for (const file of this.app.vault.getMarkdownFiles()) {
-      if (file.path === this.sourcePath) continue;
+      const isHost = file.path === this.sourcePath;
+      if (isHost && !includeSelf) continue;
       const cache = this.app.metadataCache.getFileCache(file);
       const items = cache?.listItems;
       if (!items || !items.some(li => li.task !== undefined)) continue;
       const tags = this.tagsOf(cache);
-      if (!inSource(file.path, tags, sources)) continue;
-      if (!noteMatchesQuery(cache?.frontmatter ?? {}, props, needle)) continue;
+      // With include-self the host note is always shown, whatever the query, properties and source.
+      if (!isHost) {
+        if (!inSource(file.path, tags, folders, sourceTags)) continue;
+        if (!noteMatchesQuery(cache?.frontmatter ?? {}, properties, needle)) continue;
+      }
 
       const lines = (await this.app.vault.cachedRead(file)).split("\n");
       const depthByLine = new Map<number, number>();
@@ -194,16 +212,17 @@ export class TaskSearchView extends MarkdownRenderChild {
 
   /** One line under the toolbar summarising what the block searches for. */
   private renderCriteria(root: HTMLElement): void {
-    const query = (this.cfg["query"] ?? "").trim();
-    const props = splitList(this.cfg["properties"]);
-    const sources = splitList(this.cfg["source"]);
+    const { query, properties, folders, tags, includeSelf } = this.cfg;
     const criteria: [string, string][] = query
       ? [
           ["Query", query],
-          ["Properties", props.length && !props.includes("*") ? props.join(", ") : "any property"],
+          ["Properties", properties.length && !properties.includes("*") ? properties.join(", ") : "any property"],
         ]
       : [["Query", "none – all notes with tasks"]];
-    criteria.push(["Source", sources.length ? sources.join(", ") : "entire vault"]);
+    if (folders.length) criteria.push(["Folders", folders.join(", ")]);
+    if (tags.length) criteria.push(["Tags", tags.join(", ")]);
+    if (!folders.length && !tags.length) criteria.push(["Source", "entire vault"]);
+    if (includeSelf) criteria.push(["Include this note", "yes"]);
 
     const el = root.createDiv({ cls: "tsearch-criteria" });
     for (const [label, value] of criteria) {

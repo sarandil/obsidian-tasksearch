@@ -1,5 +1,5 @@
-import { Plugin } from "obsidian";
-import { Config, parseConfig, parseStatuses } from "./logic";
+import { Plugin, parseYaml } from "obsidian";
+import { BlockConfig, parseBlock } from "./block-config";
 import { checkForUpdate } from "./changelog";
 import { ReleaseNotesModal, allEntries, entriesForUpdate, vaultHasTaskSearchBlock } from "./release-notes";
 import { DEFAULT_SETTINGS, TaskSearchSettingTab, TaskSearchSettings } from "./settings";
@@ -15,9 +15,9 @@ export default class TaskSearchPlugin extends Plugin {
     await this.loadSettings();
 
     this.registerMarkdownCodeBlockProcessor("task-search", (src, el, ctx) => {
-      const cfg = parseConfig(src);
-      const state = this.stateFor(`${ctx.sourcePath}::${src}`, cfg);
-      ctx.addChild(new TaskSearchView(this, el, cfg, ctx.sourcePath, state));
+      const { config, error, legacy } = parseBlock(src, parseYaml);
+      const state = this.stateFor(`${ctx.sourcePath}::${src}`, config);
+      ctx.addChild(new TaskSearchView(this, el, config, ctx.sourcePath, state, error, legacy));
     });
 
     this.addCommand({
@@ -48,10 +48,10 @@ export default class TaskSearchPlugin extends Plugin {
     await this.saveSettings();
   }
 
-  private stateFor(key: string, cfg: Config): ViewState {
+  private stateFor(key: string, cfg: BlockConfig): ViewState {
     let s = this.states.get(key);
     if (!s) {
-      s = { filter: "", tag: "", statuses: new Set(parseStatuses(cfg["status"])), collapsed: new Set() };
+      s = { filter: "", tag: "", statuses: new Set(cfg.status), collapsed: new Set() };
       this.states.set(key, s);
     }
     return s;

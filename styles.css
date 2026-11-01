@@ -16,6 +16,17 @@
   max-width: 300px;
   min-width: 8em;
 }
+.tsearch-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}
+.tsearch-error-action {
+  font-size: var(--font-ui-small);
+}
 .tsearch-count,
 .tsearch-meta,
 .tsearch-empty {
