@@ -55,6 +55,7 @@ The list refreshes automatically when your notes change, and the filters you've 
 ## Settings
 
 - **Title property:** the frontmatter property used as the group heading (default `title`). Notes without it are shown by file name.
+- **Show release notes after updates:** opens a window with the changes after Task search is updated (default on). The **Show release notes** command opens it at any time.
 
 ## Privacy
 

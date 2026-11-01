@@ -1,5 +1,7 @@
 import { Plugin } from "obsidian";
 import { Config, parseConfig, parseStatuses } from "./logic";
+import { checkForUpdate } from "./changelog";
+import { ReleaseNotesModal, allEntries, entriesForUpdate, vaultHasTaskSearchBlock } from "./release-notes";
 import { DEFAULT_SETTINGS, TaskSearchSettingTab, TaskSearchSettings } from "./settings";
 import { TaskSearchView, ViewState } from "./view";
 
@@ -18,7 +20,32 @@ export default class TaskSearchPlugin extends Plugin {
       ctx.addChild(new TaskSearchView(this, el, cfg, ctx.sourcePath, state));
     });
 
+    this.addCommand({
+      id: "show-release-notes",
+      name: "Show release notes",
+      callback: () => new ReleaseNotesModal(this.app, "Release notes", allEntries(this.manifest.version)).open(),
+    });
+
     this.addSettingTab(new TaskSearchSettingTab(this.app, this));
+
+    // Runs after the vault has loaded, so the update check doesn't delay startup.
+    this.app.workspace.onLayoutReady(() => void this.showReleaseNotesAfterUpdate());
+  }
+
+  /** Opens the "What's new" window once after an update, then records the running version. */
+  private async showReleaseNotesAfterUpdate(): Promise<void> {
+    const current = this.manifest.version;
+    const lastSeen = this.settings.lastSeenVersion;
+    if (lastSeen === current) return;
+
+    const { showSince } = await checkForUpdate(current, lastSeen, () => vaultHasTaskSearchBlock(this.app));
+    if (showSince && this.settings.showReleaseNotes) {
+      const entries = entriesForUpdate(showSince, current);
+      if (entries.length) new ReleaseNotesModal(this.app, "What's new in Task search", entries).open();
+    }
+
+    this.settings.lastSeenVersion = current;
+    await this.saveSettings();
   }
 
   private stateFor(key: string, cfg: Config): ViewState {

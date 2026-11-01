@@ -129,3 +129,19 @@
   display: inline;
   margin: 0;
 }
+
+/* Release notes window */
+.tsearch-release-notes {
+  width: min(640px, 90vw);
+}
+.tsearch-release-notes-body {
+  user-select: text;
+}
+.tsearch-release-notes-body h2 {
+  margin-top: var(--size-4-6);
+  padding-bottom: var(--size-4-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.tsearch-release-notes-body h2:first-child {
+  margin-top: 0;
+}
