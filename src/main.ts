@@ -62,7 +62,15 @@ export default class TaskSearchPlugin extends Plugin {
     const blockStatus = cfg.status.join(",");
     let s = this.states.get(key);
     if (!s) {
-      s = { filter: "", tag: "", statuses: new Set(cfg.status), blockStatus, collapsed: new Set() };
+      s = {
+        filter: "",
+        tag: "",
+        statuses: new Set(cfg.status),
+        blockStatus,
+        collapsed: new Set(),
+        panelOpen: false,
+        panelFocus: null,
+      };
       this.states.set(key, s);
     } else if (s.blockStatus !== blockStatus) {
       s.statuses.clear();

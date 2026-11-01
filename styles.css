@@ -78,6 +78,91 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Search button and search settings panel */
+.tsearch-bar button.tsearch-search-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-1);
+}
+.tsearch-bar button.tsearch-search-button.is-active {
+  color: var(--text-accent);
+}
+.tsearch-search-icon {
+  display: inline-flex;
+}
+.tsearch-search-icon svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+.tsearch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  margin-bottom: var(--size-4-3);
+  padding: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+  font-size: var(--font-ui-small);
+}
+.tsearch-panel-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-1) var(--size-4-3);
+}
+.tsearch-panel-label {
+  flex: 0 0 9em;
+  color: var(--text-muted);
+}
+.tsearch-panel-control {
+  flex: 1 1 14em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-1) var(--size-4-2);
+  min-width: 0;
+}
+.tsearch-panel input.tsearch-panel-query {
+  flex: 1 1 300px;
+  max-width: 480px;
+  min-width: 8em;
+}
+.tsearch-panel input.tsearch-panel-add {
+  flex: 0 1 180px;
+  min-width: 8em;
+}
+.tsearch-panel-chip {
+  align-items: center;
+  padding-inline-end: 2px;
+}
+.tsearch-chip-remove.clickable-icon {
+  padding: 1px;
+  height: auto;
+}
+.tsearch-chip-remove svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+.tsearch-panel-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  cursor: pointer;
+}
+.tsearch-panel-check input[type="checkbox"] {
+  margin: 0;
+}
+.tsearch-panel-hint {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.tsearch-is-saving .tsearch-bar,
+.tsearch-is-saving .tsearch-panel {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 /* Search criteria summary under the toolbar */
 .tsearch-criteria {
   display: flex;
@@ -97,6 +182,13 @@
 }
 .tsearch-chip-label {
   color: var(--text-muted);
+}
+.tsearch-criteria-chip {
+  cursor: pointer;
+}
+.tsearch-criteria-chip:hover,
+.tsearch-criteria-chip:focus-visible {
+  border-color: var(--interactive-accent);
 }
 .tsearch-chip-value {
   color: var(--text-normal);

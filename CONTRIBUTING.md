@@ -40,6 +40,7 @@ To try your build in Obsidian, copy `main.js`, `manifest.json` and `styles.css` 
 | `src/main.ts` | Plugin entry point; registers the `task-search` code block and the settings tab. |
 | `src/view.ts` | Renders a code block: toolbar, search criteria, grouped task list and task actions. |
 | `src/status-picker.ts` | The multi-select status dropdown. |
+| `src/search-panel.ts` | The search settings panel (query, properties, folders, tags, include this note) with its pickers. |
 | `src/settings.ts` | Plugin settings. |
 | `src/changelog.ts` | Changelog parsing, validation and version selection, with no Obsidian dependency. |
 | `src/release-notes.ts` | The "What's new" window and the update check. |
