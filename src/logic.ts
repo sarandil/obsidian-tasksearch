@@ -1,36 +1,8 @@
 // Pure helpers – no Obsidian imports, so they can be unit-tested in Node.
 
-export type Config = Record<string, string>;
-
-/** Lowercase, trimmed config key. */
+/** Lowercase, trimmed key. */
 function normalizeKey(s: string): string {
   return s.toLowerCase().trim();
-}
-
-/**
- * Parses the body of a `task-search` code block:
- *   key: value
- *   # comment line
- * Keys are case-insensitive. Surrounding quotes around a value are removed.
- */
-export function parseConfig(src: string): Config {
-  const cfg: Config = {};
-  for (const raw of src.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const i = line.indexOf(":");
-    if (i < 0) continue;
-    const key = normalizeKey(line.slice(0, i));
-    let value = line.slice(i + 1).trim();
-    if (value.length >= 2 && /^(["']).*\1$/.test(value)) value = value.slice(1, -1);
-    cfg[key] = value;
-  }
-  return cfg;
-}
-
-/** "a, b ,c" → ["a","b","c"] */
-export function splitList(s?: string): string[] {
-  return (s ?? "").split(",").map(x => x.trim()).filter(Boolean);
 }
 
 /** Flattens a frontmatter value to searchable text. */
@@ -139,12 +111,12 @@ export const STATUS_CHOICES: [string, string][] = [
 const DEFAULT_STATUSES = ["todo"];
 
 /**
- * Parses the `status` option into the statuses selected when the block opens.
- * Accepts a comma-separated list (`todo, question`) or `all`; unknown values are ignored.
+ * Turns the `status` option into the statuses selected when the block opens.
+ * Accepts status ids (`todo`, `question`, …) or `all`; unknown values are ignored.
  * Falls back to `todo` when nothing valid is given.
  */
-export function parseStatuses(s?: string): string[] {
-  const parts = splitList(s).map(normalizeKey);
+export function parseStatuses(values: string[] = []): string[] {
+  const parts = values.map(normalizeKey);
   if (parts.includes("all")) return STATUS_FILTERS.map(f => f.id);
   const ids = STATUS_FILTERS.map(f => f.id).filter(id => parts.includes(id));
   return ids.length ? ids : [...DEFAULT_STATUSES];
@@ -157,13 +129,17 @@ export function matchesStatuses(ch: string, selected: ReadonlySet<string>): bool
 
 // ----- Sources -----
 
-/** `source: Work/, Projects, #client` → folders OR'd, tags OR'd, the two groups AND'd. */
-export function inSource(path: string, fileTags: string[], sources: string[]): boolean {
-  if (!sources.length) return true;
-  const folders = sources.filter(s => !s.startsWith("#")).map(s => s.replace(/^\/+|\/+$/g, ""));
-  const tags = sources.filter(s => s.startsWith("#")).map(s => s.toLowerCase());
-  const ft = fileTags.map(t => t.toLowerCase());
-  const okFolder = !folders.length || folders.some(f => f === "" || path === f || path.startsWith(f + "/"));
-  const okTag = !tags.length || tags.some(t => ft.some(x => x === t || x.startsWith(t + "/")));
+/**
+ * Source filter: folders are OR-ed, tags are OR-ed, and the two groups are AND-ed.
+ * `folders` have no leading or trailing slashes; `tags` have no `#`.
+ * `fileTags` are the note's tags as Obsidian reports them (with `#`).
+ * A tag also matches its nested tags: `client` matches `#client/abc`.
+ */
+export function inSource(path: string, fileTags: string[], folders: string[], tags: string[]): boolean {
+  const ft = fileTags.map(t => t.replace(/^#/, "").toLowerCase());
+  const okFolder = !folders.length || folders.some(f => path === f || path.startsWith(f + "/"));
+  const okTag =
+    !tags.length ||
+    tags.map(t => t.toLowerCase()).some(t => ft.some(x => x === t || x.startsWith(t + "/")));
   return okFolder && okTag;
 }

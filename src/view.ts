@@ -11,21 +11,24 @@ import {
   TFile,
   debounce,
   getAllTags,
+  setIcon,
 } from "obsidian";
+import { BlockConfig } from "./block-config";
+import type { BlockWriter } from "./block-writer";
+import { PanelField, SearchPanel } from "./search-panel";
 import {
-  Config,
   STATUS_CHOICES,
   STATUS_FILTERS,
   fmGet,
   inSource,
   noteMatchesQuery,
   setTaskStatus,
-  splitList,
   matchesStatuses,
   taskText,
   toText,
   toggleStatus,
 } from "./logic";
+import { ReleaseNotesModal, allEntries } from "./release-notes";
 import { DEFAULT_SETTINGS } from "./settings";
 import { StatusPicker } from "./status-picker";
 import type TaskSearchPlugin from "./main";
@@ -36,6 +39,12 @@ export interface ViewState {
   tag: string;
   /** Selected statuses (ids from STATUS_FILTERS). */
   statuses: Set<string>;
+  /** The `status` option of the block when the selection was last synced with it. */
+  blockStatus: string;
+  /** Whether the search settings panel is open. */
+  panelOpen: boolean;
+  /** Panel field to focus after the next render (set when a panel change is saved). */
+  panelFocus: PanelField | null;
   collapsed: Set<string>;
 }
 
@@ -68,6 +77,12 @@ export class TaskSearchView extends MarkdownRenderChild {
   private statusPicker!: StatusPicker;
   private counter!: HTMLElement;
   private list!: HTMLElement;
+  private searchButton!: HTMLButtonElement;
+  private panel: SearchPanel | null = null;
+  private panelEl: HTMLElement | null = null;
+  private criteriaEl!: HTMLElement;
+  /** A change is being written to the block; the view is replaced when it is done. */
+  private saving = false;
 
   /** Owns everything rendered into the list; replaced on every render so nothing leaks. */
   private renderScope: Component = new Component();
@@ -75,9 +90,13 @@ export class TaskSearchView extends MarkdownRenderChild {
   constructor(
     private plugin: TaskSearchPlugin,
     containerEl: HTMLElement,
-    private cfg: Config,
+    private cfg: BlockConfig,
     private sourcePath: string,
     private state: ViewState,
+    private writer: BlockWriter,
+    private configError?: string,
+    /** The block is in the pre-0.4.0 format; the error offers the release notes. */
+    private legacyFormat = false,
   ) {
     super(containerEl);
     this.app = plugin.app;
@@ -87,6 +106,18 @@ export class TaskSearchView extends MarkdownRenderChild {
     const root = this.containerEl;
     root.empty();
     root.addClass("tsearch");
+
+    if (this.configError) {
+      const err = root.createDiv({ cls: "tsearch-error" });
+      err.createSpan({ text: this.configError });
+      if (this.legacyFormat) {
+        const btn = err.createEl("button", { cls: "tsearch-error-action", text: "Show release notes" });
+        btn.addEventListener("click", () =>
+          new ReleaseNotesModal(this.app, "Release notes", allEntries(this.plugin.manifest.version)).open(),
+        );
+      }
+      return;
+    }
 
     const bar = root.createDiv({ cls: "tsearch-bar" });
 
@@ -103,11 +134,31 @@ export class TaskSearchView extends MarkdownRenderChild {
       this.render();
     });
 
-    this.statusPicker = this.addChild(new StatusPicker(bar, this.state.statuses, () => this.render()));
+    this.statusPicker = this.addChild(
+      new StatusPicker(
+        bar,
+        this.state.statuses,
+        () => this.render(),
+        // Saved when the dropdown closes: the re-render after the write would close it.
+        () => void this.saveStatuses(),
+      ),
+    );
+
+    this.searchButton = bar.createEl("button", {
+      cls: "tsearch-search-button",
+      text: "Search",
+      attr: { "aria-expanded": "false" },
+    });
+    setIcon(this.searchButton.createSpan({ cls: "tsearch-search-icon", prepend: true }), "sliders-horizontal");
+    this.searchButton.addEventListener("click", () => this.togglePanel(!this.state.panelOpen));
 
     this.counter = bar.createSpan({ cls: "tsearch-count" });
-    this.renderCriteria(root);
+    this.panelEl = root.createDiv({ cls: "tsearch-panel-host" });
+    this.criteriaEl = root.createDiv({ cls: "tsearch-criteria" });
+    this.renderCriteria();
     this.list = root.createDiv({ cls: "tsearch-list" });
+    this.togglePanel(this.state.panelOpen, this.state.panelFocus ?? undefined);
+    this.state.panelFocus = null;
     this.list.createDiv({ cls: "tsearch-empty", text: "Loading…" });
 
     // Internal links rendered inside task text
@@ -148,19 +199,22 @@ export class TaskSearchView extends MarkdownRenderChild {
   }
 
   private async collect(): Promise<TaskGroup[]> {
-    const needle = (this.cfg["query"] ?? "").toLowerCase().trim();
-    const props = splitList(this.cfg["properties"]);
-    const sources = splitList(this.cfg["source"]);
+    const { properties, folders, tags: sourceTags, includeSelf } = this.cfg;
+    const needle = this.cfg.query.toLowerCase();
     const out: TaskGroup[] = [];
 
     for (const file of this.app.vault.getMarkdownFiles()) {
-      if (file.path === this.sourcePath) continue;
+      const isHost = file.path === this.sourcePath;
+      if (isHost && !includeSelf) continue;
       const cache = this.app.metadataCache.getFileCache(file);
       const items = cache?.listItems;
       if (!items || !items.some(li => li.task !== undefined)) continue;
       const tags = this.tagsOf(cache);
-      if (!inSource(file.path, tags, sources)) continue;
-      if (!noteMatchesQuery(cache?.frontmatter ?? {}, props, needle)) continue;
+      // With include-self the host note is always shown, whatever the query, properties and source.
+      if (!isHost) {
+        if (!inSource(file.path, tags, folders, sourceTags)) continue;
+        if (!noteMatchesQuery(cache?.frontmatter ?? {}, properties, needle)) continue;
+      }
 
       const lines = (await this.app.vault.cachedRead(file)).split("\n");
       const depthByLine = new Map<number, number>();
@@ -192,26 +246,80 @@ export class TaskSearchView extends MarkdownRenderChild {
 
   // ----- rendering -----
 
-  /** One line under the toolbar summarising what the block searches for. */
-  private renderCriteria(root: HTMLElement): void {
-    const query = (this.cfg["query"] ?? "").trim();
-    const props = splitList(this.cfg["properties"]);
-    const sources = splitList(this.cfg["source"]);
-    const criteria: [string, string][] = query
-      ? [
-          ["Query", query],
-          ["Properties", props.length && !props.includes("*") ? props.join(", ") : "any property"],
-        ]
-      : [["Query", "none – all notes with tasks"]];
-    criteria.push(["Source", sources.length ? sources.join(", ") : "entire vault"]);
+  /** Opens or closes the search settings panel; the criteria chips are hidden while it is open. */
+  private togglePanel(open: boolean, focus?: PanelField): void {
+    this.state.panelOpen = open;
+    this.searchButton.setAttr("aria-expanded", String(open));
+    this.searchButton.toggleClass("is-active", open);
+    this.criteriaEl.toggle(!open);
+    const host = this.panelEl;
+    if (!host) return;
+    host.empty();
+    this.panel = null;
+    if (!open) return;
+    this.panel = new SearchPanel(this.app, this.cfg, (next, field) => void this.saveConfig(next, field));
+    this.panel.render(host);
+    if (!focus) return;
+    // After a re-render the block may not be in the document yet; focus once it is.
+    const panel = this.panel;
+    if (host.isConnected) panel.focus(focus);
+    else host.win.requestAnimationFrame(() => panel.focus(focus));
+  }
 
-    const el = root.createDiv({ cls: "tsearch-criteria" });
-    for (const [label, value] of criteria) {
-      const chip = el.createSpan({ cls: "tsearch-chip" });
-      chip.createSpan({ cls: "tsearch-chip-label", text: label });
-      chip.createSpan({ cls: "tsearch-chip-value", text: value });
+  /**
+   * Writes a changed configuration to the block. Until the block is re-rendered, further
+   * changes are ignored, because they would be checked against the old block text.
+   * `focus` is the panel field to focus in the re-rendered view.
+   */
+  private async saveConfig(next: BlockConfig, focus: PanelField | null = null): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
+    this.containerEl.addClass("tsearch-is-saving");
+    this.state.panelFocus = focus;
+    const written = await this.writer.save(next);
+    if (!written) {
+      // Nothing changed or the write failed: this view stays, so it takes input again.
+      this.saving = false;
+      this.containerEl.removeClass("tsearch-is-saving");
+      this.state.panelFocus = null;
     }
   }
+
+  /** One line under the toolbar summarising what the block searches for; a click opens the panel. */
+  private renderCriteria(): void {
+    const { query, properties, folders, tags, includeSelf } = this.cfg;
+    const criteria: [string, string, PanelField][] = query
+      ? [
+          ["Query", query, "query"],
+          [
+            "Properties",
+            properties.length && !properties.includes("*") ? properties.join(", ") : "any property",
+            "properties",
+          ],
+        ]
+      : [["Query", "none – all notes with tasks", "query"]];
+    if (folders.length) criteria.push(["Folders", folders.join(", "), "folders"]);
+    if (tags.length) criteria.push(["Tags", tags.join(", "), "tags"]);
+    if (!folders.length && !tags.length) criteria.push(["Source", "entire vault", "folders"]);
+    if (includeSelf) criteria.push(["Include this note", "yes", "include-self"]);
+
+    for (const [label, value, field] of criteria) {
+      const chip = this.criteriaEl.createSpan({
+        cls: "tsearch-chip tsearch-criteria-chip",
+        attr: { role: "button", tabindex: "0", "aria-label": `Edit ${label.toLowerCase()}` },
+      });
+      chip.createSpan({ cls: "tsearch-chip-label", text: label });
+      chip.createSpan({ cls: "tsearch-chip-value", text: value });
+      chip.addEventListener("click", () => this.togglePanel(true, field));
+      chip.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.togglePanel(true, field);
+        }
+      });
+    }
+  }
+
 
   private rebuildTagOptions(): void {
     const tags = [...new Set(this.data.flatMap(g => g.tags))].sort((a, b) => a.localeCompare(b));
@@ -332,6 +440,14 @@ export class TaskSearchView extends MarkdownRenderChild {
   }
 
   // ----- actions -----
+
+  /** Writes the status selection to the block; an empty selection is not saved. */
+  private async saveStatuses(): Promise<void> {
+    if (!this.state.statuses.size || this.saving) return;
+    const status = STATUS_FILTERS.map(f => f.id).filter(id => this.state.statuses.has(id));
+    this.state.blockStatus = status.join(",");
+    await this.saveConfig({ ...this.cfg, status });
+  }
 
   private async setStatus(g: TaskGroup, t: TaskItem, ch: string): Promise<void> {
     if (ch === t.status) return;

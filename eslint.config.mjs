@@ -4,7 +4,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
   // Build/test tooling runs in Node, not in Obsidian – only the plugin source is checked.
-  { ignores: ["main.js", "node_modules/", ".test/", "test/", "version-bump.mjs"] },
+  { ignores: ["main.js", "node_modules/", ".test/", ".build/", "test/", "scripts/", "version-bump.mjs"] },
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {

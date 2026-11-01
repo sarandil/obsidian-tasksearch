@@ -3,23 +3,14 @@ const { test } = require("node:test");
 const assert = require("node:assert");
 const L = require("../.test/logic.cjs");
 
-test("parseConfig: case-insensitive keys, comments and quotes", () => {
-  const c = L.parseConfig(
-    `# comment\nQuery: client-x\nProperties: project, client\nSource: "Work/"\nstatus: Done\nno colon here`,
-  );
-  assert.deepStrictEqual(c, { query: "client-x", properties: "project, client", source: "Work/", status: "Done" });
-  assert.deepStrictEqual(L.parseConfig("query: a: b"), { query: "a: b" });
-});
-
-test("splitList and parseStatuses", () => {
-  assert.deepStrictEqual(L.splitList(" a, b ,, c "), ["a", "b", "c"]);
-  assert.deepStrictEqual(L.parseStatuses("Done"), ["done"]);
-  assert.deepStrictEqual(L.parseStatuses("question, todo"), ["todo", "question"]);
-  assert.deepStrictEqual(L.parseStatuses("Other, DONE"), ["done", "other"]);
-  assert.deepStrictEqual(L.parseStatuses("all"), ["todo", "done", "question", "important", "star", "other"]);
-  assert.deepStrictEqual(L.parseStatuses("star, important"), ["important", "star"]);
-  assert.deepStrictEqual(L.parseStatuses(undefined), ["todo"]);
-  assert.deepStrictEqual(L.parseStatuses("nonsense"), ["todo"]);
+test("parseStatuses", () => {
+  assert.deepStrictEqual(L.parseStatuses(["Done"]), ["done"]);
+  assert.deepStrictEqual(L.parseStatuses(["question", "todo"]), ["todo", "question"]);
+  assert.deepStrictEqual(L.parseStatuses(["Other", "DONE"]), ["done", "other"]);
+  assert.deepStrictEqual(L.parseStatuses(["all"]), ["todo", "done", "question", "important", "star", "other"]);
+  assert.deepStrictEqual(L.parseStatuses(["star", "important"]), ["important", "star"]);
+  assert.deepStrictEqual(L.parseStatuses(), ["todo"]);
+  assert.deepStrictEqual(L.parseStatuses(["nonsense"]), ["todo"]);
 });
 
 test("toText flattens frontmatter values", () => {
@@ -85,9 +76,13 @@ test("matchesStatuses: multi-select", () => {
 });
 
 test("inSource: folders OR, tags OR, groups AND", () => {
-  assert.ok(L.inSource("Work/a.md", [], ["Work/"]));
-  assert.ok(!L.inSource("Workshop/a.md", [], ["Work"]));
-  assert.ok(L.inSource("x/a.md", ["#client/abc"], ["#client"]));
-  assert.ok(!L.inSource("x/a.md", ["#client"], ["Work", "#client"]));
-  assert.ok(L.inSource("x/a.md", [], []));
+  assert.ok(L.inSource("Work/a.md", [], ["Work"], []));
+  assert.ok(!L.inSource("Workshop/a.md", [], ["Work"], []));
+  assert.ok(L.inSource("Work/Sub/a.md", [], ["Work"], []));
+  assert.ok(L.inSource("x/a.md", ["#client/abc"], [], ["client"]));
+  assert.ok(L.inSource("x/a.md", ["#Client"], [], ["client"]));
+  assert.ok(!L.inSource("x/a.md", ["#clients"], [], ["client"]));
+  assert.ok(!L.inSource("x/a.md", ["#client"], ["Work"], ["client"]));
+  assert.ok(L.inSource("Work/a.md", ["#client"], ["Work", "Home"], ["client", "other"]));
+  assert.ok(L.inSource("x/a.md", [], [], []));
 });

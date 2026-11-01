@@ -20,11 +20,15 @@ export class StatusPicker extends Component {
   private popover: HTMLElement | null = null;
   private rows = new Map<string, OptionRow>();
   private counts = new Map<string, number>();
+  /** The selection changed since the popover was opened. */
+  private changed = false;
 
   constructor(
     parent: HTMLElement,
     private selected: Set<string>,
     private onChange: () => void,
+    /** Called when the user closes the popover after changing the selection. */
+    private onCommit: () => void,
   ) {
     super();
     this.button = parent.createEl("button", {
@@ -72,7 +76,7 @@ export class StatusPicker extends Component {
   }
 
   onunload(): void {
-    this.close();
+    this.close(false);
   }
 
   /** Updates the per-status task counts shown in the popover. */
@@ -98,6 +102,7 @@ export class StatusPicker extends Component {
     });
     this.popover = pop;
     this.rows.clear();
+    this.changed = false;
 
     for (const s of STATUS_FILTERS) {
       const row = pop.createEl("label", { cls: "menu-item tsearch-status-option" });
@@ -110,6 +115,7 @@ export class StatusPicker extends Component {
       checkbox.addEventListener("change", () => {
         if (checkbox.checked) this.selected.add(s.id);
         else this.selected.delete(s.id);
+        this.changed = true;
         this.updateSummary();
         this.onChange();
       });
@@ -122,12 +128,15 @@ export class StatusPicker extends Component {
     this.rows.get(STATUS_FILTERS[0].id)?.checkbox.focus();
   }
 
-  private close(): void {
+  /** Closes the popover; with `commit`, reports a changed selection through `onCommit`. */
+  private close(commit = true): void {
     if (!this.popover) return;
     this.popover.detach();
     this.popover = null;
     this.rows.clear();
     this.button.setAttr("aria-expanded", "false");
+    if (commit && this.changed) this.onCommit();
+    this.changed = false;
   }
 
   private refreshRows(): void {
